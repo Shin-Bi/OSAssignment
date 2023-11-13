@@ -77,6 +77,11 @@ sys_sleep(void)
   return 0;
 }
 
+int
+sys_dummy(void) {
+  return 23;
+}
+
 // return how many clock tick interrupts have occurred
 // since start.
 int

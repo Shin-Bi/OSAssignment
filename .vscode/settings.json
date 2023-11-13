@@ -1,0 +1,10 @@
+{
+    "files.associations": {
+        "proc.h": "c",
+        "file.h": "c",
+        "fcntl.h": "c",
+        "types.h": "c",
+        "defs.h": "c",
+        "user.h": "c"
+    }
+}
