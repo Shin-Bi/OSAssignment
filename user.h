@@ -24,6 +24,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int dummy(void);
+int clone(void (*func) (void), void *stack);
 
 // ulib.c
 int stat(const char*, struct stat*);
@@ -38,3 +39,6 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+
+// ulibextended.c
+int thread_create(void (*func) (void));

@@ -221,6 +221,42 @@ fork(void)
   return pid;
 }
 
+int clone(void (*func)(), void *stack) {
+    int tid;
+    struct proc *np;
+    struct proc *curproc = myproc();
+
+    // Allocate process=thread.
+    if ((np = allocproc()) == 0) {
+        return -1;
+    }
+
+    np->pgdir = curproc->pgdir;
+    np->sz = curproc->sz;
+    np->parent = curproc;
+    *np->tf = *curproc->tf;
+
+    // Set up stack for new thread.
+    uint sp = (uint)stack;
+    sp -= 4;  // Decrease stack pointer for return address.
+    *(uint*)sp = 0xFFFFFFFF;  // return address : 0xFFFFFFFF
+
+    np->tf->eip = (uint)func;  // Set eip to parameter func
+    np->tf->esp = sp;  // Set esp to stack
+
+    tid = np->pid;  // tid = pid
+
+    acquire(&ptable.lock);
+    
+    np->state = RUNNABLE;
+
+    release(&ptable.lock);
+
+    return tid;
+}
+
+
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
