@@ -221,42 +221,6 @@ fork(void)
   return pid;
 }
 
-int clone(void (*func)(), void *stack) {
-    int tid;
-    struct proc *np;
-    struct proc *curproc = myproc();
-
-    // Allocate process=thread.
-    if ((np = allocproc()) == 0) {
-        return -1;
-    }
-
-    np->pgdir = curproc->pgdir;
-    np->sz = curproc->sz;
-    np->parent = curproc;
-    *np->tf = *curproc->tf;
-
-    // Set up stack for new thread.
-    uint sp = (uint)stack;
-    sp -= 4;  // Decrease stack pointer for return address.
-    *(uint*)sp = 0xFFFFFFFF;  // return address : 0xFFFFFFFF
-
-    np->tf->eip = (uint)func;  // Set eip to parameter func
-    np->tf->esp = sp;  // Set esp to stack
-
-    tid = np->pid;  // tid = pid
-
-    acquire(&ptable.lock);
-    
-    np->state = RUNNABLE;
-
-    release(&ptable.lock);
-
-    return tid;
-}
-
-
-
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -566,5 +530,111 @@ procdump(void)
         cprintf(" %p", pc[i]);
     }
     cprintf("\n");
+  }
+}
+
+int
+clone(void (*func)(), void *stack)
+{
+    int tid;
+    struct proc *np;
+    struct proc *curproc = myproc();
+
+    // Allocate process=thread.
+    if ((np = allocproc()) == 0) {
+        return -1;
+    }
+
+    np->pgdir = curproc->pgdir;
+    np->sz = curproc->sz;
+    np->parent = curproc;
+    *np->tf = *curproc->tf;
+
+    // Set up stack for new thread.
+    uint sp = (uint)stack;
+    sp -= 4;  // Decrease stack pointer for return address.
+    *(uint*)sp = 0xFFFFFFFF;  // return address : 0xFFFFFFFF
+
+    np->tf->eip = (uint)func;  // Set eip to parameter func
+    np->tf->esp = sp;  // Set esp to stack
+
+    tid = np->pid;  // tid = pid
+
+    acquire(&ptable.lock);
+    
+    np->state = RUNNABLE;
+
+    release(&ptable.lock);
+
+    return tid;
+}
+
+void
+texit(void)
+{
+  struct proc *curproc = myproc();
+  struct proc *p;
+
+  if(curproc == initproc)
+    panic("init exiting");
+
+  acquire(&ptable.lock);
+
+  // Parent might be sleeping in wait().
+  wakeup1(curproc->parent);
+
+  // Pass abandoned children to init.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->parent == curproc){
+      p->parent = initproc;
+      if(p->state == ZOMBIE)
+        wakeup1(initproc);
+    }
+  }
+
+  // Jump into the scheduler, never to return.
+  curproc->state = ZOMBIE;
+  sched();
+  panic("zombie exit");
+}
+
+int
+join (void)
+{
+  struct proc *p;
+  int havekids, tid;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children (threads in this context).
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE){
+        // Found one.
+        tid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return tid;
+      }
+    }
+
+    // No point waiting if we don't have any children (threads).
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children (threads) to exit.
+    sleep(curproc, &ptable.lock);
   }
 }

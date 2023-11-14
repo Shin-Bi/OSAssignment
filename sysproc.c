@@ -78,11 +78,6 @@ sys_sleep(void)
   return 0;
 }
 
-int
-sys_dummy(void) {
-  return 23;
-}
-
 // return how many clock tick interrupts have occurred
 // since start.
 int
@@ -96,8 +91,15 @@ sys_uptime(void)
   return xticks;
 }
 
+int
+sys_dummy(void) {
+  return 23;
+}
+
+
 extern int clone(void (*func)(), void *stack);
-int sys_clone(void) {
+int 
+sys_clone(void) {
     void (*fcn)();
     void *arg1;
     if (argptr(0, (void*)&fcn, sizeof(fcn)) < 0) {
@@ -108,4 +110,16 @@ int sys_clone(void) {
         return -1;
     }
     return clone(fcn, arg1);
+}
+
+extern int join(void);
+int
+sys_join(void) {
+  return join();
+}
+
+extern int texit(void);
+int
+sys_texit(void) {
+  return texit();
 }
